@@ -2,6 +2,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import cors from 'cors';
 import helmet from 'helmet';
 import { randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
 import { rateLimit } from 'express-rate-limit';
 import { createCaseSchema, type CaseContent } from '@mystery/shared';
 import { config } from './config.js';
@@ -93,4 +94,12 @@ app.post('/api/v1/cases/:caseId/accusation', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 app.delete('/api/v1/cases/:caseId', async (req, res, next) => { try { const doc = await authorized(req, res); if (!doc) return; const { CaseModel } = await import('./model.js'); if (CaseModel.db.readyState === 1) await CaseModel.deleteOne({ publicId: doc.publicId }); else { const { deleteMemoryCase } = await import('./store.js'); deleteMemoryCase(doc.publicId); } res.status(204).end(); } catch (err) { next(err); } });
+if (config.NODE_ENV === 'production') {
+  const clientDist = resolve(process.cwd(), 'client/dist');
+  app.use(express.static(clientDist, { index: false, maxAge: '1y', immutable: true }));
+  app.get('/{*splat}', (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next();
+    res.sendFile(resolve(clientDist, 'index.html'));
+  });
+}
 app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => { void _next; const id = (req as Request & { requestId?: string }).requestId; const code = err instanceof Error && err.message === 'DATABASE_UNAVAILABLE' ? 'DATABASE_UNAVAILABLE' : 'INTERNAL_ERROR'; console.error(JSON.stringify({ requestId: id, error: code })); res.status(code === 'DATABASE_UNAVAILABLE' ? 503 : 500).json({ error: { code, message: code === 'DATABASE_UNAVAILABLE' ? 'Case storage is temporarily unavailable. Please retry.' : 'Something went wrong. Please try again.', requestId: id } }); });

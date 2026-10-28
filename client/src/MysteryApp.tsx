@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createCaseSchema, type CaseLifecycle, type PublicCase, type Evidence } from '@mystery/shared';
 import './mystery.css';
 
-const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api/v1' : 'http://localhost:4000/api/v1');
+const API = import.meta.env.VITE_API_URL || '/api/v1';
 type Err = { error?: { message?: string } };
 async function request<T>(path: string, token?: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API}${path}`, { ...init, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init?.headers } });
