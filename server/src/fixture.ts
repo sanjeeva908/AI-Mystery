@@ -1,0 +1,45 @@
+import type { CaseContent } from '@mystery/shared';
+
+export function fixture(premise: string, setting: string, difficulty = 'easy'): CaseContent {
+  const place = setting || 'the Bellweather Conservatory';
+  const date = '2026-04-12T20:15:00.000Z';
+  const data: CaseContent = {
+    caseFile: { title: 'The Vanishing Moonstone', summary: premise, incident: { dateTime: date, location: place } },
+    suspects: [
+      { id: 'S-01', name: 'Mira Vale', role: 'Conservator', profile: 'Keeps the gallery records and knows the display cases.', knownMotive: 'Her restoration proposal was delayed.', alibi: 'Says she was in the archive.' },
+      { id: 'S-02', name: 'Jonas Reed', role: 'Night caretaker', profile: 'Makes the evening rounds and carries a service key.', knownMotive: 'Has a large, unexplained debt.', alibi: 'Says he was checking the east corridor.' },
+      { id: 'S-03', name: 'Ada Finch', role: 'Visiting cataloguer', profile: 'Was documenting the collection for a new catalogue.', knownMotive: 'Wanted the exhibit to attract a sponsor.', alibi: 'Says she left before closing.' },
+    ],
+    timeline: [
+      { id: 'T-01', timestamp: '2026-04-12T19:40:00.000Z', description: 'The final gallery tour ends.', suspectIds: ['S-01','S-02','S-03'], evidenceIds: ['E-01'], kind: 'observed' },
+      { id: 'T-02', timestamp: '2026-04-12T20:02:00.000Z', description: 'A service key opens the Moonstone case.', suspectIds: ['S-02'], evidenceIds: ['E-02','E-03'], kind: 'observed' },
+      { id: 'T-03', timestamp: '2026-04-12T20:15:00.000Z', description: 'The empty mount is noticed during the closing check.', suspectIds: ['S-01','S-02'], evidenceIds: ['E-04'], kind: 'observed' },
+      { id: 'T-04', timestamp: '2026-04-12T20:28:00.000Z', description: 'A wrapped parcel is recovered in the caretaker’s supply cupboard.', suspectIds: ['S-02'], evidenceIds: ['E-05'], kind: 'observed' },
+    ],
+    evidence: [
+      { id: 'E-01', type: 'witness_statement', title: 'Closing guide’s note', summary: 'The tour ended before the case was opened.', timestamp: '2026-04-12T19:40:00.000Z', source: 'Fictional staff statement', body: 'The guide remembers Mira and Ada leaving the gallery together at 19:40. Jonas stayed behind to complete his rounds.', personIds: ['S-01','S-02','S-03'], location: place, relatedEventIds: ['T-01'] },
+      { id: 'E-02', type: 'digital_log', title: 'Case access record', summary: 'The service key was used at 20:02.', timestamp: '2026-04-12T20:02:00.000Z', source: 'Fictional access log', body: 'At 20:02, service key K-2 opened the Moonstone case. K-2 was signed out to Jonas Reed for the evening. The visitor key remained sealed.', personIds: ['S-02'], location: place, relatedEventIds: ['T-02'] },
+      { id: 'E-03', type: 'document', title: 'Restoration desk receipt', summary: 'A matching padded sleeve was purchased earlier.', timestamp: '2026-04-12T18:10:00.000Z', source: 'Fictional shop receipt', body: 'A padded blue transport sleeve was charged to the caretaker supply account. The receipt is signed “J. Reed.” The same distinctive blue thread appears on the recovered parcel.', personIds: ['S-02'], location: 'Staff shop', relatedEventIds: ['T-02','T-04'] },
+      { id: 'E-04', type: 'cctv_log', title: 'West passage event log', summary: 'A wrapped object was carried toward the supply room.', timestamp: '2026-04-12T20:11:00.000Z', source: 'Fictional camera event log — no real footage', body: 'The fictional motion log records one person carrying a small wrapped object from the gallery toward the caretaker’s supply room. The display is a narrative event log, not authentic surveillance.', personIds: ['S-02'], location: 'West passage', relatedEventIds: ['T-03','T-04'] },
+      { id: 'E-05', type: 'forensic_report', title: 'Supply cupboard inventory', summary: 'The missing stone is inside the recovered parcel.', timestamp: '2026-04-12T20:28:00.000Z', source: 'Fictional narrative inventory', body: 'Staff found the Moonstone inside a padded blue sleeve in the caretaker’s supply cupboard. The sleeve bears the same shop stitching recorded on the receipt.', personIds: ['S-02'], location: 'Caretaker supply room', relatedEventIds: ['T-04'] },
+    ],
+    answerKey: { culpritSuspectId: 'S-02', motive: 'Jonas planned to sell the Moonstone to settle his debts.', opportunity: 'His signed-out service key opened the case, and he remained on site after the tour.', reconstruction: [ { timestamp: '19:40', description: 'The tour ends; Jonas remains on duty.', evidenceIds: ['E-01'] }, { timestamp: '20:02', description: 'Jonas uses his assigned service key to open the case.', evidenceIds: ['E-02'] }, { timestamp: '20:11', description: 'He carries the wrapped stone to the supply room.', evidenceIds: ['E-04'] }, { timestamp: '20:28', description: 'The stone is found in the matching sleeve in his cupboard.', evidenceIds: ['E-03','E-05'] } ], evidenceReasoning: [ { evidenceId: 'E-02', interpretation: 'The key was assigned to Jonas, linking him to the only recorded opening.', relationship: 'supports' }, { evidenceId: 'E-03', interpretation: 'The signed receipt connects Jonas to the distinctive sleeve.', relationship: 'supports' }, { evidenceId: 'E-04', interpretation: 'The parcel moves from gallery to the caretaker room.', relationship: 'supports' }, { evidenceId: 'E-05', interpretation: 'The stolen object is recovered in Jonas’s assigned cupboard.', relationship: 'supports' }, { evidenceId: 'E-01', interpretation: 'Mira and Ada had left before the case was opened; Jonas’s debts create a plausible red herring trail.', relationship: 'contradicts' } ], redHerrings: [ { evidenceId: 'E-01', explanation: 'Mira’s delayed proposal and Ada’s ambition sound suspicious, but both left before the recorded opening.' } ], hints: difficulty === 'easy' ? ['Compare who remained in the gallery after the tour.', 'The access record names an assigned key holder.'] : ['Compare who remained in the gallery after the tour.', 'The access record names an assigned key holder.', 'The recovered wrapping connects the case opening to a suspect.'], fairnessNotes: ['Independent access, transport, and recovery clues identify the same suspect.'] },
+  };
+  if (difficulty !== 'easy') {
+    data.suspects.push(
+      { id: 'S-04', name: 'Theo March', role: 'Gallery electrician', profile: 'Maintains the older lighting system and knows the back corridors.', knownMotive: 'A promised contract renewal was postponed.', alibi: 'Says he was checking the breaker room.' },
+      { id: 'S-05', name: 'Lena Quill', role: 'Museum archivist', profile: 'Catalogues the collection and maintains the paper registers.', knownMotive: 'A rival archive recently received a grant.', alibi: 'Says she was filing records in the annex.' },
+    );
+    data.evidence.push(
+      { id: 'E-06', type: 'witness_statement', title: 'Electrician’s shift note', summary: 'Theo was working away from the display room.', timestamp: '2026-04-12T20:06:00.000Z', source: 'Fictional staff statement', body: 'Theo reports that a circuit test kept him in the breaker room during the access event. No visitor key was issued to him.', personIds: ['S-04'], location: 'Breaker room', relatedEventIds: ['T-02'] },
+      { id: 'E-07', type: 'document', title: 'Archive register', summary: 'Lena signed into the annex during the incident.', timestamp: '2026-04-12T19:58:00.000Z', source: 'Fictional archive log', body: 'The annex register records Lena Quill’s signature at 19:58. The annex door log shows no exit until 20:19.', personIds: ['S-05'], location: 'Archive annex', relatedEventIds: ['T-02','T-03'] },
+      { id: 'E-08', type: 'digital_log', title: 'Key cabinet register', summary: 'The visitor key stayed in its sealed slot.', timestamp: '2026-04-12T20:04:00.000Z', source: 'Fictional cabinet audit', body: 'A routine cabinet check confirms visitor key V-1 remained sealed. Service key K-2 was the only key checked out.', personIds: ['S-02','S-04','S-05'], location: 'Key cabinet', relatedEventIds: ['T-02'] },
+    );
+  }
+  if (difficulty === 'hard') {
+    data.suspects.push({ id: 'S-06', name: 'Iris Bell', role: 'Café manager', profile: 'Closed the museum café and delivered refreshments to staff.', knownMotive: 'She hoped to fund a small independent gallery.', alibi: 'Says she was settling the café till.' });
+    const titles = ['Café till closeout', 'North hall delivery note', 'Staff corridor schedule', 'Evening supply checklist', 'Gallery temperature log', 'Visitor coat check'];
+    for (let index = 0; index < 6; index++) data.evidence.push({ id: `E-${String(index + 9).padStart(2, '0')}`, type: index % 2 ? 'document' : 'witness_statement', title: titles[index]!, summary: 'A routine record adds context to the evening.', timestamp: `2026-04-12T20:${String(3 + index).padStart(2, '0')}:00.000Z`, source: 'Fictional museum record', body: 'This routine record is consistent with the stated schedule and does not place anyone at the display case.', personIds: [index % 2 ? 'S-06' : 'S-04'], location: place, relatedEventIds: ['T-02'] });
+  }
+  return data;
+}

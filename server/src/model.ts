@@ -1,0 +1,4 @@
+import mongoose, { Schema } from 'mongoose';
+const caseSchema = new Schema({ publicId: { type: String, unique: true, required: true }, accessTokenHash: { type: String, required: true }, status: { type: String, enum: ['generating','ready','failed','completed','expired'], default: 'generating' }, premise: { type: String, required: true }, settings: { type: Schema.Types.Mixed, required: true }, content: { type: Schema.Types.Mixed }, generation: { type: Schema.Types.Mixed, required: true }, progress: { reviewedEvidenceIds: [String], inspectedSuspectIds: [String], hintsUsed: { type: Number, default: 0 } }, accusation: { type: Schema.Types.Mixed }, createdAt: { type: Date, default: Date.now }, updatedAt: { type: Date, default: Date.now }, expiresAt: { type: Date, required: true } }, { minimize: false });
+caseSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+export const CaseModel = mongoose.models.MysteryCase ?? mongoose.model('MysteryCase', caseSchema);
