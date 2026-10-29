@@ -25,7 +25,30 @@ function Brand() {
   return <a className="brand" href="/" aria-label="The Night Archive home"><span className="brand-seal" aria-hidden="true">N</span><span>THE NIGHT ARCHIVE</span></a>;
 }
 
+type Theme = 'light' | 'dark';
+
+function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void }) {
+  const nextMode = theme === 'dark' ? 'light' : 'dark';
+  return <button className="theme-toggle" type="button" aria-label={'Switch to ' + nextMode + ' mode'} onClick={onToggle}><span aria-hidden="true">{theme === 'dark' ? '☼' : '☾'}</span><span>{theme === 'dark' ? 'Light' : 'Dark'}</span></button>;
+}
 function App() {
+  const [themeChoice, setThemeChoice] = useState<Theme | null>(() => {
+    const saved = window.localStorage.getItem('mystery-theme');
+    return saved === 'light' || saved === 'dark' ? saved : null;
+  });
+  const [systemTheme, setSystemTheme] = useState<Theme>(() => window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  const theme = themeChoice ?? systemTheme;
+  useEffect(() => {
+    const preference = window.matchMedia('(prefers-color-scheme: light)');
+    const updateSystemTheme = (event: MediaQueryListEvent) => setSystemTheme(event.matches ? 'light' : 'dark');
+    preference.addEventListener('change', updateSystemTheme);
+    return () => preference.removeEventListener('change', updateSystemTheme);
+  }, []);
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    if (themeChoice) window.localStorage.setItem('mystery-theme', themeChoice);
+  }, [theme, themeChoice]);
+  const toggleTheme = () => setThemeChoice(theme === 'dark' ? 'light' : 'dark');
   const match = window.location.pathname.match(/^\/case\/([^/]+)/);
   const caseId = match?.[1];
   const [premise, setPremise] = useState('A priceless moonstone vanishes from a locked gallery during the evening closing tour.');
@@ -185,7 +208,7 @@ function App() {
     ];
     return (
       <main className="landing">
-        <header className="site-header"><Brand /><nav className="header-links" aria-label="Main navigation"><a href="#method">How it works</a><a className="header-action" href="#new-case">Start investigating <span>↗</span></a></nav></header>
+        <header className="site-header"><Brand /><nav className="header-links" aria-label="Main navigation"><a href="#method">How it works</a><a className="header-action" href="#new-case">Start investigating <span>↗</span></a></nav><ThemeToggle theme={theme} onToggle={toggleTheme} /></header>
         <section className="landing-hero" aria-labelledby="hero-title">
           <div className="hero-copy"><p className="eyebrow"><span className="eyebrow-mark" /> FICTIONAL CASEWORK · OPEN AN INVESTIGATION</p><h1 id="hero-title">Every Mystery<br /><em>Has a Truth.</em></h1><p className="hero-intro">An AI-crafted mystery. A room full of people with stories. A trail of evidence that only you can connect.</p><a className="button button-primary hero-cta" href="#new-case">Start Investigating <span>↗</span></a><div className="hero-assurance"><i /> No account required <span /> Your case stays yours</div></div>
           <div className="scene-card" role="img" aria-label="Illustrated fictional case board with connected evidence">
@@ -221,7 +244,7 @@ function App() {
 
   return (
     <main className="case-app">
-      <header className="case-topbar"><Brand /><div className="case-reference"><i /> FICTIONAL CASE <span /> {data.caseId.slice(0, 8).toUpperCase()}</div><a className="new-case-link" href="/">Close file <b>×</b></a></header>
+      <header className="case-topbar"><Brand /><div className="case-reference"><i /><small>FICTIONAL CASE</small><span />{data.caseId.slice(0, 8).toUpperCase()}</div><div className="case-header-actions"><ThemeToggle theme={theme} onToggle={toggleTheme} /><a className="new-case-link" href="/">Close file <b>×</b></a></div></header>
       <div className="case-layout">
         <aside className="rail">
           <div className="rail-label"><span className="eyebrow">INVESTIGATION ROOM</span><span className="rail-seal">N</span></div>

@@ -2,6 +2,15 @@ import { expect, test } from '@playwright/test';
 
 test('player investigates, resumes, requests a hint, and submits one final accusation', async ({ page }) => {
   await page.goto('/');
+  const initialTheme = await page.locator('html').getAttribute('data-theme');
+  expect(['light', 'dark']).toContain(initialTheme);
+  const initialSurface = await page.locator('html').evaluate((element) => getComputedStyle(element).getPropertyValue('--bg').trim());
+  const alternateTheme = initialTheme === 'dark' ? 'light' : 'dark';
+  await page.getByRole('button', { name: 'Switch to ' + alternateTheme + ' mode' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', alternateTheme);
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', alternateTheme);
+  await page.getByRole('button', { name: 'Switch to ' + initialTheme + ' mode' }).click();
   await expect(page.getByRole('heading', { name: /Every Mystery/i })).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: `test-results/${test.info().project.name}-landing.png`, fullPage: true });
@@ -10,6 +19,11 @@ test('player investigates, resumes, requests a hint, and submits one final accus
   await page.getByRole('button', { name: /Generate Mystery/i }).click();
   await expect(page).toHaveURL(/\/case\/[A-Za-z0-9_-]{32}$/);
   await expect(page.getByRole('heading', { name: 'The Vanishing Moonstone' })).toBeVisible();
+  const caseTheme = await page.locator('html').getAttribute('data-theme');
+  const caseAlternate = caseTheme === 'dark' ? 'light' : 'dark';
+  await page.getByRole('button', { name: 'Switch to ' + caseAlternate + ' mode' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', caseAlternate);
+  await page.getByRole('button', { name: 'Switch to ' + caseTheme + ' mode' }).click();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: `test-results/${test.info().project.name}-case-room.png`, fullPage: true });
 
