@@ -2,12 +2,12 @@ import { expect, test } from '@playwright/test';
 
 test('player investigates, resumes, requests a hint, and submits one final accusation', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /Every detail/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Every Mystery/i })).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: `test-results/${test.info().project.name}-landing.png`, fullPage: true });
   await page.getByLabel('Your premise').fill('A silver compass vanishes from a locked observatory after a storm.');
   await page.getByRole('checkbox').check();
-  await page.getByRole('button', { name: /Create mystery/i }).click();
+  await page.getByRole('button', { name: /Generate Mystery/i }).click();
   await expect(page).toHaveURL(/\/case\/[A-Za-z0-9_-]{32}$/);
   await expect(page.getByRole('heading', { name: 'The Vanishing Moonstone' })).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
