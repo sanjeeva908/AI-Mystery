@@ -2,6 +2,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import cors from 'cors';
 import helmet from 'helmet';
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { rateLimit } from 'express-rate-limit';
 import { createCaseSchema, type CaseContent } from '@mystery/shared';
@@ -95,7 +96,8 @@ app.post('/api/v1/cases/:caseId/accusation', async (req, res, next) => {
 });
 app.delete('/api/v1/cases/:caseId', async (req, res, next) => { try { const doc = await authorized(req, res); if (!doc) return; const { CaseModel } = await import('./model.js'); if (CaseModel.db.readyState === 1) await CaseModel.deleteOne({ publicId: doc.publicId }); else { const { deleteMemoryCase } = await import('./store.js'); deleteMemoryCase(doc.publicId); } res.status(204).end(); } catch (err) { next(err); } });
 if (config.NODE_ENV === 'production') {
-  const clientDist = resolve(process.cwd(), 'client/dist');
+  const clientDistCandidates = [resolve(process.cwd(), 'client/dist'), resolve(process.cwd(), '../client/dist')];
+  const clientDist = clientDistCandidates.find((path) => existsSync(resolve(path, 'index.html'))) ?? clientDistCandidates[1];
   app.use(express.static(clientDist, { index: false, maxAge: '1y', immutable: true }));
   app.get('/{*splat}', (req, res, next) => {
     if (req.path.startsWith('/api/')) return next();
