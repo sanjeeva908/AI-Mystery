@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 
 test('player investigates, resumes, requests a hint, and submits one final accusation', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   const initialTheme = await page.locator('html').getAttribute('data-theme');
   expect(['light', 'dark']).toContain(initialTheme);
@@ -14,6 +16,7 @@ test('player investigates, resumes, requests a hint, and submits one final accus
   await expect(page.getByRole('heading', { name: /Every Mystery/i })).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: `test-results/${test.info().project.name}-landing.png`, fullPage: true });
+  await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto'; window.scrollTo(0, document.getElementById('new-case')?.offsetTop ?? 0); });
   await page.getByLabel('Your premise').fill('A silver compass vanishes from a locked observatory after a storm.');
   await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: /Generate Mystery/i }).click();
@@ -58,11 +61,17 @@ test('player investigates, resumes, requests a hint, and submits one final accus
 });
 
 test('landing scene supports accessible clue inspection, reduced motion, and its WebGL fallback', async ({ page }) => {
+  test.setTimeout(60_000);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   const canvas = page.locator('.investigation-scene canvas');
   await expect(canvas).toBeVisible();
   await expect(page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).resolves.toBe(true);
+  if ((page.viewportSize()?.width ?? 1280) < 500) {
+    await page.getByRole('button', { name: 'Open navigation' }).click();
+    await expect(page.getByRole('link', { name: 'How it works' })).toBeVisible();
+    await page.getByRole('button', { name: 'Close navigation' }).click();
+  }
 
   const bounds = await canvas.boundingBox();
   if (!bounds) throw new Error('The investigation scene canvas has no visible bounds.');
@@ -73,9 +82,15 @@ test('landing scene supports accessible clue inspection, reduced motion, and its
   await expect(page.getByRole('dialog')).toContainText('Timeline');
   await page.getByRole('button', { name: 'Close clue preview' }).click();
 
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(page.getByRole('button', { name: 'Inspect suspect photograph' })).toBeVisible();
   await page.getByRole('button', { name: 'Inspect suspect photograph' }).click();
   await expect(page.getByRole('dialog')).toContainText('Person of interest');
   await page.getByRole('button', { name: 'Close clue preview' }).click();
+  await page.evaluate(() => window.scrollTo(0, window.innerHeight));
+  await expect(page.locator('.investigation-scene')).toHaveAttribute('data-chapter', '1');
+  await page.evaluate(() => window.scrollTo(0, window.innerHeight * 2));
+  await expect(page.locator('.investigation-scene')).toHaveAttribute('data-chapter', '2');
   await page.locator('.hero-cta').click();
   await expect(page.locator('#premise')).toBeInViewport();
 
@@ -90,4 +105,22 @@ test('landing scene supports accessible clue inspection, reduced motion, and its
   await expect(page.locator('.investigation-scene')).toHaveClass(/webgl-unavailable/);
   await expect(page.locator('.scene-fallback')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open case file' })).toBeEnabled();
+});
+
+test('desktop cursor follows the pointer and camera travels through story chapters', async ({ page }) => {
+  test.setTimeout(30_000);
+  test.skip((page.viewportSize()?.width ?? 1280) < 500, 'Custom cursor is desktop-only.');
+  await page.goto('/');
+  await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto'; });
+  await expect(page.locator('.investigation-scene canvas')).toBeVisible();
+  const action = page.locator('.hero-cta');
+  const bounds = await action.boundingBox();
+  if (!bounds) throw new Error('The primary action has no visible bounds.');
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  await expect(page.locator('.interactive-cursor')).toHaveClass(/is-hot/);
+  await expect.poll(() => page.locator('.interactive-cursor').evaluate((element) => (element as HTMLElement).style.transform)).not.toBe('');
+  await page.evaluate(() => window.scrollTo(0, window.innerHeight));
+  await expect(page.locator('.investigation-scene')).toHaveAttribute('data-chapter', '1');
+  await page.evaluate(() => window.scrollTo(0, window.innerHeight * 4));
+  await expect(page.locator('.investigation-scene')).toHaveAttribute('data-chapter', '4');
 });
