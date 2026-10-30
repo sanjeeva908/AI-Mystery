@@ -56,3 +56,38 @@ test('player investigates, resumes, requests a hint, and submits one final accus
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Jonas Reed' })).toBeVisible();
 });
+
+test('landing scene supports accessible clue inspection, reduced motion, and its WebGL fallback', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const canvas = page.locator('.investigation-scene canvas');
+  await expect(canvas).toBeVisible();
+  await expect(page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).resolves.toBe(true);
+
+  const bounds = await canvas.boundingBox();
+  if (!bounds) throw new Error('The investigation scene canvas has no visible bounds.');
+  const mobile = (page.viewportSize()?.width ?? 1280) < 500;
+  await page.mouse.move(bounds.x + bounds.width * (mobile ? .75 : .65), bounds.y + bounds.height * (mobile ? .47 : .43));
+  await expect(page.locator('.scene-tooltip')).toContainText('click to inspect');
+  await page.mouse.click(bounds.x + bounds.width * (mobile ? .75 : .65), bounds.y + bounds.height * (mobile ? .47 : .43));
+  await expect(page.getByRole('dialog')).toContainText('Timeline');
+  await page.getByRole('button', { name: 'Close clue preview' }).click();
+
+  await page.getByRole('button', { name: 'Inspect suspect photograph' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Person of interest');
+  await page.getByRole('button', { name: 'Close clue preview' }).click();
+  await page.locator('.hero-cta').click();
+  await expect(page.locator('#premise')).toBeInViewport();
+
+  await page.addInitScript(() => {
+    const original = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (kind: string, ...args: unknown[]) {
+      if (kind === 'webgl' || kind === 'webgl2' || kind === 'experimental-webgl') return null;
+      return original.call(this, kind as '2d', ...(args as []));
+    };
+  });
+  await page.reload();
+  await expect(page.locator('.investigation-scene')).toHaveClass(/webgl-unavailable/);
+  await expect(page.locator('.scene-fallback')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open case file' })).toBeEnabled();
+});

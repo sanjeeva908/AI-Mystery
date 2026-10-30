@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { createCaseSchema, type CaseLifecycle, type PublicCase, type Evidence } from '@mystery/shared';
 import './mystery.css';
+
+const InvestigationScene = lazy(() => import('./InvestigationScene').then((scene) => ({ default: scene.InvestigationScene })));
 
 const API = import.meta.env.VITE_API_URL || '/api/v1';
 type Err = { error?: { message?: string } };
@@ -70,6 +72,12 @@ function App() {
   const [pendingAccusation, setPendingAccusation] = useState(false);
   const [hint, setHint] = useState('');
   const [hintBusy, setHintBusy] = useState(false);
+  const [scenePreview, setScenePreview] = useState('');
+  const startInvestigating = useCallback(() => {
+    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    document.getElementById('new-case')?.scrollIntoView({ behavior });
+  }, []);
+  const selectSceneEvidence = useCallback((label: string) => setScenePreview(label), []);
   const token = caseId ? localStorage.getItem(tokenKey(caseId)) || '' : '';
 
   async function loadCase(id: string, auth: string) {
@@ -209,15 +217,13 @@ function App() {
     return (
       <main className="landing">
         <header className="site-header"><Brand /><nav className="header-links" aria-label="Main navigation"><a href="#method">How it works</a><a className="header-action" href="#new-case">Start investigating <span>↗</span></a></nav><ThemeToggle theme={theme} onToggle={toggleTheme} /></header>
+        <Suspense fallback={<div className="investigation-scene scene-loading" aria-hidden="true" />}><InvestigationScene theme={theme} onStart={startInvestigating} onSelect={selectSceneEvidence} /></Suspense>
         <section className="landing-hero" aria-labelledby="hero-title">
-          <div className="hero-copy"><p className="eyebrow"><span className="eyebrow-mark" /> FICTIONAL CASEWORK · OPEN AN INVESTIGATION</p><h1 id="hero-title">Every Mystery<br /><em>Has a Truth.</em></h1><p className="hero-intro">An AI-crafted mystery. A room full of people with stories. A trail of evidence that only you can connect.</p><a className="button button-primary hero-cta" href="#new-case">Start Investigating <span>↗</span></a><div className="hero-assurance"><i /> No account required <span /> Your case stays yours</div></div>
-          <div className="scene-card" role="img" aria-label="Illustrated fictional case board with connected evidence">
-            <div className="scene-grid" /><div className="scene-heading"><span>ARCHIVE / 0412</span><span className="scene-status"><i /> ACTIVE</span></div><div className="scene-ring" /><div className="scene-ring scene-ring-two" /><span className="scene-crosshair">+</span>
-            <div className="scene-file scene-file-main"><b>N</b><small>CASE NOTE 04</small><strong>The missing hour</strong><span>One detail does not fit.</span></div><div className="scene-file scene-file-side"><small>WITNESS / 02</small><strong>Statement logged</strong><i /></div><i className="scene-pin pin-one" /><i className="scene-pin pin-two" /><div className="scene-connector" /><div className="scene-timeline"><span>19:40</span><i /><span>20:02</span><i /><span>20:15</span></div><div className="scene-coordinates">51°30′26.4″N &nbsp; 0°07′39.2″W</div><div className="scene-stamp">FICTION<br />ONLY</div>
-          </div>
+          <div className="hero-copy"><p className="eyebrow"><span className="eyebrow-mark" /> FICTIONAL CASEWORK · OPEN AN INVESTIGATION</p><h1 id="hero-title">Every Mystery<br /><em>Has a Truth.</em></h1><p className="hero-intro">Enter an AI-powered investigation. Examine evidence, question suspects, reconstruct timelines, and uncover the truth.</p><a className="button button-primary hero-cta" href="#new-case">Start Investigating <span>↗</span></a><a className="experience-link" href="#method">Explore the experience <span>↓</span></a><div className="hero-assurance"><i /> No account required <span /> Your case stays yours</div></div>
           <div className="hero-index"><span>THE NIGHT ARCHIVE</span><span>VOL. 01 — THE ART OF NOTICING</span></div>
+          <div className="scene-hint" aria-hidden="true">MOVE TO EXPLORE <span>·</span> CLICK A CLUE TO INSPECT</div>
         </section>
-        <section className="method-section" id="method"><div className="section-heading"><div><p className="eyebrow">A BETTER KIND OF WHODUNNIT</p><h2>Follow the evidence.<br /><em>Not the noise.</em></h2></div><p>Each room is a self-contained story. Read carefully, ask for a nudge when you need one, and decide what the facts support.</p></div><div className="method-grid"><article><span>01</span><i /><h3>A case, made for you</h3><p>Turn a premise into a complete fictional mystery.</p></article><article><span>02</span><i /><h3>Every clue has a place</h3><p>Read records, compare accounts, and follow the timeline.</p></article><article><span>03</span><i /><h3>Make the call</h3><p>Use the evidence and submit one final accusation.</p></article></div></section>
+        <section className="method-section" id="method"><div className="section-heading"><div><p className="eyebrow">A BETTER KIND OF WHODUNNIT</p><h2>Enter the room.<br /><em>Read between lines.</em></h2></div><p>Follow the investigation through five connected moments. Every clue leads to a real case action.</p></div><div className="method-grid story-grid"><article><span>01</span><i /><h3>Enter the mystery</h3><p>Build a fictional case around your own opening premise.</p></article><article><span>02</span><i /><h3>Examine the evidence</h3><p>Open records and review their full source and contents.</p></article><article><span>03</span><i /><h3>Investigate suspects</h3><p>Compare profiles, motives, and recorded alibis.</p></article><article><span>04</span><i /><h3>Connect the clues</h3><p>Reconstruct the timeline and request a hint when useful.</p></article><article><span>05</span><i /><h3>Uncover the truth</h3><p>Make one final accusation when you are ready.</p></article></div></section>
         <section className="intake-section" id="new-case"><div className="intake-intro"><p className="eyebrow">THE NEXT FILE IS YOURS</p><h2>Set the scene.<br /><em>We’ll build the case.</em></h2><p>Give us the spark of a story. Choose an atmosphere. We’ll prepare a fair case with suspects, evidence, and a trail to follow.</p><div className="intake-note"><span>✳</span> Fiction for entertainment. No real people or events are investigated.</div></div>
           <form className="create-card" onSubmit={create}><div className="form-heading"><div><span className="eyebrow">NEW INVESTIGATION</span><h3>Write your opening line</h3></div><span className="step">01 <i /> 01</span></div>
             <label className="field-label" htmlFor="premise">Your premise</label><textarea id="premise" value={premise} onChange={(event) => setPremise(event.target.value)} maxLength={1500} minLength={20} rows={4} required aria-describedby="premise-note" placeholder="A locked room, a missing heirloom, a witness who remembers too much…" /><div className="field-meta" id="premise-note"><span>At least 20 characters. Keep it fictional.</span><span>{premise.length} / 1,500</span></div>
@@ -227,6 +233,7 @@ function App() {
             <label className="fiction-consent"><input type="checkbox" required /><span>I understand this is a fictional story and generated details are invented.</span></label>{error && <p className="error-message" role="alert">{error}</p>}<button className="button button-primary generate-button" disabled={busy}>{busy ? <><i className="spinner" /> Building your case…</> : <>Generate Mystery <span>↗</span></>}</button><p className="form-footnote">◇ &nbsp; Anonymous case · Expires after 30 days · No account needed</p>
           </form>
         </section>
+        {scenePreview && <div className="scene-preview-scrim" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setScenePreview(''); }}><section className="scene-preview" role="dialog" aria-modal="true" aria-labelledby="scene-preview-title"><button type="button" className="close" aria-label="Close clue preview" onClick={() => setScenePreview('')}>×</button><p className="eyebrow">FICTIONAL FIELD NOTE · PROP FILE</p><h2 id="scene-preview-title">{scenePreview}</h2><p>This exhibit represents the kind of fictional material you can examine in an investigation. Create a case to inspect its actual suspect profiles, source records, and timeline.</p><button className="button button-primary" onClick={() => { setScenePreview(''); startInvestigating(); }}>Start a new investigation ↗</button></section></div>}
         <footer className="site-footer"><Brand /><span>FICTION FOR THE CURIOUS.</span><a href="https://github.com/sanjeeva908/AI-Mystery" target="_blank" rel="noreferrer">Built around the details ↗</a></footer>
       </main>
     );
