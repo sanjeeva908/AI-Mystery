@@ -56,6 +56,12 @@ test('player investigates, resumes, requests a hint, and submits one final accus
   await expect(page.getByText('FINAL FINDING')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Jonas Reed' })).toBeVisible();
   await expect(page.getByText('CASE SOLVED')).toBeVisible();
+  await expect(page.getByText('evidence reviewed', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Review the evidence' }).click();
+  await expect(page.getByRole('tabpanel', { name: 'Evidence' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Return to the verdict' })).toBeVisible();
+  await page.getByRole('button', { name: 'Return to the verdict' }).click();
+  await expect(page.getByRole('heading', { name: 'Jonas Reed' })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Jonas Reed' })).toBeVisible();
 });

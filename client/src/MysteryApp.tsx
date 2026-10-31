@@ -6,7 +6,7 @@ const InvestigationScene = lazy(() => import('./InvestigationScene').then((scene
 
 const API = import.meta.env.VITE_API_URL || '/api/v1';
 type Err = { error?: { message?: string } };
-type Tab = 'Briefing' | 'Suspects' | 'Evidence' | 'Timeline';
+type Tab = 'Briefing' | 'Suspects' | 'Evidence' | 'Timeline' | 'Verdict';
 const tabs: Tab[] = ['Briefing', 'Suspects', 'Evidence', 'Timeline'];
 const tokenKey = (id: string) => 'mystery-access:' + id;
 
@@ -85,6 +85,7 @@ function App() {
   const [hint, setHint] = useState('');
   const [hintBusy, setHintBusy] = useState(false);
   const [scenePreview, setScenePreview] = useState('');
+  const [reviewingCompletedCase, setReviewingCompletedCase] = useState(false);
   const startInvestigating = useCallback(() => {
     const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
     document.getElementById('new-case')?.scrollIntoView({ behavior });
@@ -107,6 +108,7 @@ function App() {
       }
       setError('');
       setData(result);
+      if (result.status === 'completed') setTab('Verdict');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load this case. Check your connection and try again.');
     }
@@ -167,6 +169,7 @@ function App() {
   async function markEvidence(item: Evidence) {
     if (!caseId || !data) return;
     setSelected(item);
+    if (data.status === 'completed') return;
     try {
       const result = await request<{ progress: PublicCase['progress'] }>('/cases/' + caseId + '/progress', token, {
         method: 'PATCH', body: JSON.stringify({ reviewedEvidenceIds: [item.id], inspectedSuspectIds: data.progress.inspectedSuspectIds }),
@@ -178,6 +181,7 @@ function App() {
   async function inspectSuspect(id: string) {
     if (!caseId || !data) return;
     setSuspect(id);
+    if (data.status === 'completed') return;
     try {
       const result = await request<{ progress: PublicCase['progress'] }>('/cases/' + caseId + '/progress', token, {
         method: 'PATCH', body: JSON.stringify({ reviewedEvidenceIds: data.progress.reviewedEvidenceIds, inspectedSuspectIds: [id] }),
@@ -209,6 +213,8 @@ function App() {
         method: 'POST', body: JSON.stringify({ suspectId: suspect }),
       });
       setData(result);
+      setTab('Verdict');
+      setReviewingCompletedCase(false);
       setPendingAccusation(false);
     } catch (e) { setError(e instanceof Error ? e.message : 'Accusation could not be submitted.'); }
     finally { setBusy(false); }
@@ -266,6 +272,7 @@ function App() {
   const completed = data.status === 'completed';
   const currentSuspect = data.suspects.find((person) => person.id === suspect);
   const reviewedPercent = data.evidence.length ? Math.round(data.progress.reviewedEvidenceIds.length / data.evidence.length * 100) : 0;
+  const caseTabs = completed ? [...tabs, 'Verdict' as const] : tabs;
 
   return (
     <main className="case-app">
@@ -274,7 +281,7 @@ function App() {
         <aside className="rail">
           <div className="rail-label"><span className="eyebrow">INVESTIGATION ROOM</span><span className="rail-seal">N</span></div>
           <div className="case-name">{data.caseFile.title}<small>⌖ &nbsp;{data.caseFile.incident.location}</small></div>
-          <nav className="section-nav" role="tablist" aria-label="Case sections">{tabs.map((item, index) => <button key={item} type="button" role="tab" aria-selected={tab === item} className={'nav-item' + (tab === item ? ' active' : '')} onClick={() => setTab(item)}><span>{'0' + (index + 1)}</span>{item}{item === 'Evidence' && <b>{data.evidence.length}</b>}</button>)}</nav>
+          <nav className="section-nav" role="tablist" aria-label="Case sections">{caseTabs.map((item, index) => <button key={item} type="button" role="tab" aria-selected={tab === item} className={'nav-item' + (tab === item ? ' active' : '')} onClick={() => { setTab(item); if (completed) setReviewingCompletedCase(item !== 'Verdict'); }}><span>{'0' + (index + 1)}</span>{item}{item === 'Evidence' && <b>{data.evidence.length}</b>}</button>)}</nav>
           <section className="progress-box" aria-label="Investigation progress"><span className="eyebrow">YOUR INVESTIGATION</span><strong>{data.progress.reviewedEvidenceIds.length}<small> / {data.evidence.length}</small></strong><span>pieces of evidence reviewed</span><div className="progress-track" role="progressbar" aria-label="Evidence reviewed" aria-valuenow={reviewedPercent} aria-valuemin={0} aria-valuemax={100}><i style={{ width: reviewedPercent + '%' }} /></div><div className="progress-meta"><span>{data.progress.inspectedSuspectIds.length} suspects examined</span><span>{data.progress.hintsUsed}/{data.hintLimit} hints</span></div></section>
           <div className="rail-bottom"><span>◇</span><p>All people, records and events in this room are fictional.</p><small>THE NIGHT ARCHIVE · VOL. 01</small></div>
         </aside>
@@ -283,20 +290,21 @@ function App() {
           <div className="case-banner"><div><p className="eyebrow">CASE BRIEF <span>/</span> {new Date(data.caseFile.incident.dateTime).toLocaleDateString()}</p><h1>{data.caseFile.title}</h1><p>{data.caseFile.incident.location}</p></div><span className={'status-pill' + (completed ? ' closed' : '')}><i />{completed ? 'CASE CLOSED' : 'OPEN INVESTIGATION'}</span></div>
           {error && <p className="error-message inline-error" role="alert">{error}</p>}
 
-          {completed && data.reveal ? <section className="reveal-card" aria-live="polite">
+          {completed && data.reveal && !reviewingCompletedCase ? <section className="reveal-card" aria-live="polite">
             <div className="reveal-top"><div><p className="eyebrow">FINAL FINDING · CASE {data.caseId.slice(0, 8).toUpperCase()}</p><h2>{data.accusation?.isCorrect ? 'The evidence held.' : 'The trail led elsewhere.'}</h2></div><span className={data.accusation?.isCorrect ? 'result-good' : 'result-bad'}>{data.accusation?.isCorrect ? 'CASE SOLVED' : 'CASE MISSED'}</span></div>
+            <div className="completion-stats" aria-label="Your investigation summary"><div><strong>{data.progress.reviewedEvidenceIds.length}<small> / {data.evidence.length}</small></strong><span>evidence reviewed</span></div><div><strong>{data.progress.inspectedSuspectIds.length}<small> / {data.suspects.length}</small></strong><span>profiles examined</span></div><div><strong>{data.progress.hintsUsed}<small> / {data.hintLimit}</small></strong><span>hints used</span></div></div>
             <div className="culprit-panel"><span className="eyebrow">RESPONSIBLE PARTY</span><h3>{data.reveal.culpritName}</h3><p>{data.reveal.motive}</p></div>
-            <div className="reveal-columns"><div><h3>Opportunity</h3><p>{data.reveal.opportunity}</p></div><div><h3>Reconstruction</h3>{data.reveal.reconstruction.map((event, index) => <p className="reconstruction-item" key={index}><code>{event.timestamp}</code> {event.description} {event.evidenceIds.map((id) => <button className="citation" key={id} onClick={() => { setTab('Evidence'); const item = data.evidence.find((record) => record.id === id); if (item) void markEvidence(item); }}>{id}</button>)}</p>)}</div></div>
+            <div className="reveal-columns"><div><h3>Opportunity</h3><p>{data.reveal.opportunity}</p></div><div><h3>Reconstruction</h3>{data.reveal.reconstruction.map((event, index) => <p className="reconstruction-item" key={index}><code>{event.timestamp}</code> {event.description} {event.evidenceIds.map((id) => <button className="citation" key={id} onClick={() => { setTab('Evidence'); setReviewingCompletedCase(true); const item = data.evidence.find((record) => record.id === id); if (item) void markEvidence(item); }}>{id}</button>)}</p>)}</div></div>
             <h3 className="reveal-section-title">Why the evidence matters</h3><div className="reasoning-list">{data.reveal.evidenceReasoning.map((item) => <p key={item.evidenceId}><b>{item.relationship === 'supports' ? '+' : '−'}</b><strong>{item.evidenceId}</strong><span>{item.interpretation}</span></p>)}</div>
             {data.reveal.redHerrings.length > 0 && <><h3 className="reveal-section-title">The false leads</h3><div className="reasoning-list">{data.reveal.redHerrings.map((item) => <p key={item.evidenceId}><b>↗</b><strong>{item.evidenceId}</strong><span>{item.explanation}</span></p>)}</div></>}
-            <div className="result-actions"><button className="button button-secondary" onClick={() => setTab('Evidence')}>Review the evidence</button><a className="button button-primary" href="/">Start a new case ↗</a></div>
+            <div className="result-actions"><button className="button button-secondary" onClick={() => { setTab('Evidence'); setReviewingCompletedCase(true); }}>Review the evidence</button><a className="button button-primary" href="/">Start a new case ↗</a></div>
           </section> : <>
-            <div className="mobile-progress"><span>CASE PROGRESS</span><strong>{data.progress.reviewedEvidenceIds.length} / {data.evidence.length} clues</strong><div className="progress-track"><i style={{ width: reviewedPercent + '%' }} /></div></div>
+            {!completed && <div className="mobile-progress"><span>CASE PROGRESS</span><strong>{data.progress.reviewedEvidenceIds.length} / {data.evidence.length} clues</strong><div className="progress-track"><i style={{ width: reviewedPercent + '%' }} /></div></div>}
             <section className="case-content" role="tabpanel" aria-label={tab}>
               {tab === 'Briefing' && <div className="brief-layout">
                 <article className="brief-card"><div className="card-topline"><span className="eyebrow">INCIDENT SUMMARY</span><span>FILED · {new Date(data.caseFile.incident.dateTime).toLocaleDateString()}</span></div><p className="summary">{data.caseFile.summary}</p><div className="incident-meta"><div><span>LOCATION</span><strong>{data.caseFile.incident.location}</strong></div><div><span>PERSONS OF INTEREST</span><strong>{data.suspects.length} persons</strong></div><div><span>AVAILABLE MATERIAL</span><strong>{data.evidence.length} records</strong></div><div><span>CASE REFERENCE</span><strong>{data.caseId.slice(0, 8).toUpperCase()}</strong></div></div></article>
                 <article className="objective-card"><span className="eyebrow">INVESTIGATOR’S OBJECTIVE</span><b aria-hidden="true">§</b><h2>Find the thread<br />that holds.</h2><p>Compare each account with the record. Separate what was seen from what was assumed.</p><footer><span>FOCUS</span><strong>Access · timing · motive</strong></footer></article>
-                <section className="hint-card"><div className="hint-heading"><i>?</i><div><span className="eyebrow">FIELD NOTE</span><h2>A nudge, if you need one.</h2></div></div><p>{hint || 'The fairest answer is usually supported by more than one independent clue. Take your time with the details.'}</p><div className="hint-action"><div className="hint-meter">{Array.from({ length: data.hintLimit }, (_, index) => <i key={index} className={index < data.progress.hintsUsed ? 'used' : ''} />)}<span>{data.progress.hintsUsed} / {data.hintLimit} used</span></div><button className="button button-secondary" disabled={hintBusy || data.progress.hintsUsed >= data.hintLimit} onClick={() => void requestHint()}>{hintBusy ? 'Looking for a clue…' : data.progress.hintsUsed >= data.hintLimit ? 'No hints remaining' : 'Request a hint ↗'}</button></div></section>
+                <section className="hint-card"><div className="hint-heading"><i>?</i><div><span className="eyebrow">FIELD NOTE</span><h2>A nudge, if you need one.</h2></div></div><p>{hint || 'The fairest answer is usually supported by more than one independent clue. Take your time with the details.'}</p><div className="hint-action"><div className="hint-meter">{Array.from({ length: data.hintLimit }, (_, index) => <i key={index} className={index < data.progress.hintsUsed ? 'used' : ''} />)}<span>{data.progress.hintsUsed} / {data.hintLimit} used</span></div><button className="button button-secondary" disabled={completed || hintBusy || data.progress.hintsUsed >= data.hintLimit} onClick={() => void requestHint()}>{completed ? 'Case closed' : hintBusy ? 'Looking for a clue…' : data.progress.hintsUsed >= data.hintLimit ? 'No hints remaining' : 'Request a hint ↗'}</button></div></section>
                 <div className="brief-next"><span className="eyebrow">BEGIN WITH THE PEOPLE</span><button className="text-link" onClick={() => setTab('Suspects')}>Review persons of interest ↗</button></div>
               </div>}
 
@@ -306,7 +314,8 @@ function App() {
 
               {tab === 'Timeline' && <div className="section-panel"><div className="panel-heading"><div><p className="eyebrow">SEQUENCE OF EVENTS · {data.timeline.length} ENTRIES</p><h2>Put the evening in order.</h2></div><p>Observed events come from the record. Inferred events represent conclusions drawn from available details.</p></div>{data.timeline.length ? <div className="timeline">{[...data.timeline].sort((a, b) => a.timestamp.localeCompare(b.timestamp)).map((event) => <article className="timeline-item" key={event.id}><time>{new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time><i /><div><span className="eyebrow">{event.kind === 'observed' ? 'OBSERVED' : 'INFERRED'} EVENT · {event.id}</span><p>{event.description}</p><div className="refs">{event.evidenceIds.map((id) => { const item = data.evidence.find((record) => record.id === id); return item ? <button className="citation" key={id} onClick={() => { setTab('Evidence'); void markEvidence(item); }}>{id} · {item.title}</button> : null; })}</div></div></article>)}</div> : <p className="empty-state">There are no timeline entries in this case.</p>}</div>}
             </section>
-            <section className="accusation-box"><div><span className="eyebrow">WHEN YOU’RE READY</span><h2>Make your accusation.</h2><p>This is your one final answer. The solution stays sealed until you submit.</p></div><div className="accusation-controls"><label className="sr-only" htmlFor="accused-suspect">Select a suspect</label><select id="accused-suspect" aria-label="Select a suspect" value={suspect} onChange={(event) => { setSuspect(event.target.value); if (event.target.value) void inspectSuspect(event.target.value); }}><option value="">Select a suspect…</option>{data.suspects.map((person) => <option value={person.id} key={person.id}>{person.name} · {person.role}</option>)}</select><button className="button button-primary" disabled={!suspect || busy} onClick={() => setPendingAccusation(true)}>Submit accusation ↗</button></div></section>
+            {!completed && <section className="accusation-box"><div><span className="eyebrow">WHEN YOU’RE READY</span><h2>Make your accusation.</h2><p>This is your one final answer. The solution stays sealed until you submit.</p></div><div className="accusation-controls"><label className="sr-only" htmlFor="accused-suspect">Select a suspect</label><select id="accused-suspect" aria-label="Select a suspect" value={suspect} onChange={(event) => { setSuspect(event.target.value); if (event.target.value) void inspectSuspect(event.target.value); }}><option value="">Select a suspect…</option>{data.suspects.map((person) => <option value={person.id} key={person.id}>{person.name} · {person.role}</option>)}</select><button className="button button-primary" disabled={!suspect || busy} onClick={() => setPendingAccusation(true)}>Submit accusation ↗</button></div></section>}
+            {completed && <div className="completed-review-actions"><span className="eyebrow">CASE CLOSED · REVIEW MODE</span><button className="button button-secondary" onClick={() => { setTab('Verdict'); setReviewingCompletedCase(false); }}>Return to the verdict ↗</button></div>}
           </>}
         </section>
       </div>
