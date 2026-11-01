@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { createCaseSchema, type CaseLifecycle, type PublicCase, type Evidence } from '@mystery/shared';
 import './mystery.css';
 
@@ -40,6 +41,25 @@ function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void }
   const nextMode = theme === 'dark' ? 'light' : 'dark';
   return <button className="theme-toggle" type="button" aria-label={'Switch to ' + nextMode + ' mode'} onClick={onToggle}><span aria-hidden="true">{theme === 'dark' ? '☼' : '☾'}</span><span>{theme === 'dark' ? 'Light' : 'Dark'}</span></button>;
 }
+type JourneyStage = 'Landing' | 'Create' | 'Generating' | 'Case' | 'Verdict';
+
+function StageProgress({ stage }: { stage: JourneyStage }) {
+  const stages: JourneyStage[] = ['Landing', 'Create', 'Generating', 'Case', 'Verdict'];
+  const current = stages.indexOf(stage);
+  return createPortal((
+    <nav className="stage-progress" aria-label="Investigation progress">
+      <ol>
+        {stages.map((item, index) => (
+          <li key={item} className={index === current ? 'current' : index < current ? 'complete' : ''} aria-current={index === current ? 'step' : undefined}>
+            <span className="stage-mark" aria-hidden="true">{index < current ? '✓' : String(index + 1).padStart(2, '0')}</span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  ), document.body);
+}
+
 function App() {
   const [themeChoice, setThemeChoice] = useState<Theme | null>(() => {
     const saved = window.localStorage.getItem('mystery-theme');
@@ -318,6 +338,7 @@ function App() {
       setTab('Verdict');
       setReviewingCompletedCase(false);
       setPendingAccusation(false);
+      window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     } catch (e) { setError(e instanceof Error ? e.message : 'Accusation could not be submitted.'); }
     finally { setBusy(false); }
   }
@@ -334,8 +355,19 @@ function App() {
       { value: 'classic', title: 'Classic', copy: 'Clues, motive, deduction' },
       { value: 'thriller', title: 'Thriller', copy: 'Tension with a clear trail' },
     ];
+    const difficultyOptions = [
+      { value: 'easy', title: 'Gentle', copy: 'More guidance as you investigate', mark: '01' },
+      { value: 'medium', title: 'Balanced', copy: 'A fair mix of clues and inference', mark: '02' },
+      { value: 'hard', title: 'Intricate', copy: 'More threads to connect', mark: '03' },
+    ];
+    const lengthOptions = [
+      { value: 'short', title: 'Short', copy: 'A focused case, quickly read' },
+      { value: 'standard', title: 'Standard', copy: 'A fuller evening of clues' },
+      { value: 'long', title: 'Long', copy: 'A deeper, more detailed file' },
+    ];
     return (
-      <main className="landing">
+      <main className={activeSection === 'new-case' ? 'landing is-create' : 'landing'}>
+        <StageProgress stage={activeSection === 'new-case' ? 'Create' : 'Landing'} />
         <header className="site-header floating-nav"><Brand /><nav className={'header-links' + (mobileNavOpen ? ' open' : '')} aria-label="Main navigation"><a className={activeSection === 'home' ? 'active' : ''} href="#home" onClick={() => setMobileNavOpen(false)}>Home</a><a className={activeSection === 'new-case' ? 'active' : ''} href="#new-case" onClick={() => setMobileNavOpen(false)}>Investigate</a><a className={activeSection === 'method' ? 'active' : ''} href="#method" onClick={() => setMobileNavOpen(false)}>How it works</a><a className={activeSection === 'about' ? 'active' : ''} href="#about" onClick={() => setMobileNavOpen(false)}>About</a></nav><button className="nav-menu" type="button" aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(!mobileNavOpen)}>{mobileNavOpen ? '×' : '☰'}</button><ThemeToggle theme={theme} onToggle={toggleTheme} /></header>
         <Suspense fallback={<div className="investigation-scene scene-loading" aria-hidden="true" />}><InvestigationScene theme={theme} onStart={startInvestigating} onSelect={selectSceneEvidence} /></Suspense>
         <div className="interactive-cursor" aria-hidden="true"><span /><i /></div>
@@ -356,7 +388,10 @@ function App() {
             <label className="field-label" htmlFor="premise">Your premise</label><textarea ref={premiseRef} id="premise" value={premise} onChange={(event) => { setPremise(event.target.value); if (formErrors.premise) setFormErrors((errors) => ({ ...errors, premise: undefined })); }} maxLength={1500} minLength={20} rows={4} required aria-invalid={Boolean(formErrors.premise)} aria-describedby={formErrors.premise ? 'premise-error premise-note' : 'premise-note'} placeholder="A locked room, a missing heirloom, a witness who remembers too much…" />{formErrors.premise && <p className="field-error" id="premise-error" role="alert">{formErrors.premise}</p>}<div className="field-meta" id="premise-note"><span>At least 20 characters. Keep it fictional.</span><span>{premise.length} / 1,500</span></div>
             <label className="field-label" htmlFor="setting">Setting <small>OPTIONAL</small></label><input id="setting" className="text-input" value={setting} onChange={(event) => setSetting(event.target.value)} maxLength={100} placeholder="e.g. A coastal hotel in winter" />
             <fieldset className="tone-fieldset"><legend>Tone</legend><div className="tone-options" role="radiogroup" aria-label="Tone">{tones.map((option, index) => <button key={option.value} data-tone={option.value} type="button" role="radio" tabIndex={tone === option.value ? 0 : -1} aria-checked={tone === option.value} className={'tone-option' + (tone === option.value ? ' selected' : '')} onKeyDown={(event) => handleToneKeyDown(event, index)} onClick={() => setTone(option.value)}><i /><strong>{option.title}</strong><small>{option.copy}</small></button>)}</div></fieldset>
-            <div className="select-grid"><label>Difficulty<select value={difficulty} onChange={(event) => setDifficulty(event.target.value)}><option value="easy">Easy · more guidance</option><option value="medium">Medium · balanced</option><option value="hard">Hard · more threads</option></select></label><label>Case length<select value={length} onChange={(event) => setLength(event.target.value)}><option value="short">Short · quick read</option><option value="standard">Standard · full file</option><option value="long">Long · deeper case</option></select></label></div>
+            <div className="case-options">
+              <fieldset className="choice-fieldset"><legend>Difficulty <small>Choose your pace</small></legend><div className="choice-cards">{difficultyOptions.map((option) => <label key={option.value} className={'choice-card' + (difficulty === option.value ? ' selected' : '')}><input type="radio" name="difficulty" value={option.value} checked={difficulty === option.value} onChange={() => setDifficulty(option.value)} /><span className="choice-mark">{option.mark}</span><strong>{option.title}</strong><small>{option.copy}</small></label>)}</div></fieldset>
+              <fieldset className="choice-fieldset"><legend>Case length <small>Set the depth</small></legend><div className="choice-cards">{lengthOptions.map((option) => <label key={option.value} className={'choice-card' + (length === option.value ? ' selected' : '')}><input type="radio" name="case-length" value={option.value} checked={length === option.value} onChange={() => setLength(option.value)} /><span className="choice-mark">✳</span><strong>{option.title}</strong><small>{option.copy}</small></label>)}</div></fieldset>
+            </div>
             <label className={'fiction-consent' + (formErrors.consent ? ' has-error' : '')}><input ref={consentRef} type="checkbox" required checked={fictionAccepted} aria-invalid={Boolean(formErrors.consent)} aria-describedby={formErrors.consent ? 'fiction-error' : undefined} onChange={(event) => { setFictionAccepted(event.target.checked); if (formErrors.consent) setFormErrors((errors) => ({ ...errors, consent: undefined })); }} /><span>I understand this is a fictional story and generated details are invented.</span></label>{formErrors.consent && <p className="field-error" id="fiction-error" role="alert">{formErrors.consent}</p>}{error && <p className="error-message" role="alert">{error}</p>}<button className="button button-primary generate-button" disabled={busy}>{busy ? <><i className="spinner" /> Building your case…</> : <>Generate Mystery <span>→</span></>}</button><p className="form-footnote">◇ &nbsp; Anonymous case · Expires after 30 days · No account needed</p>
           </form>
         </section>
@@ -367,10 +402,10 @@ function App() {
   }
 
   if (caseId && !data && !error) {
-    return <main className="state-screen is-generating"><header className="state-topbar"><Brand /><ThemeToggle theme={theme} onToggle={toggleTheme} /></header><div className="state-content"><span className="generation-seal" aria-hidden="true"><i /><b /></span><p className="eyebrow">CASE IN PROGRESS</p><h1>Putting the pieces in place.</h1><p className="generation-message" aria-live="polite" aria-atomic="true">{generationMessages[generationMessageIndex]}</p><div className="loading-track" role="progressbar" aria-label="Mystery generation progress" aria-valuetext="In progress"><i /></div><span className="state-footnote">Your answer key stays sealed until your final accusation.</span>{generationSlow && <section className="generation-slow" aria-live="polite"><p>This is taking longer than usual.</p><p className="generation-cancel-note">Canceling here stops this browser’s polling and starts a fresh case with the same inputs. The server may continue preparing the earlier case in the background.</p><div><button className="button button-secondary" onClick={() => setGenerationSlow(false)}>Keep waiting</button><button className="button button-primary" disabled={busy} onClick={() => void cancelAndRetryGeneration()}>{busy ? 'Starting a fresh attempt…' : 'Cancel & retry'}</button></div></section>}{error && <p className="error-message" role="alert">{error}</p>}</div></main>;
+    return <main className="state-screen is-generating"><StageProgress stage="Generating" /><header className="state-topbar"><Brand /><ThemeToggle theme={theme} onToggle={toggleTheme} /></header><div className="state-content"><span className="generation-seal" aria-hidden="true"><i /><b /></span><p className="eyebrow">CASE IN PROGRESS</p><h1>Putting the pieces in place.</h1><p className="generation-message" aria-live="polite" aria-atomic="true">{generationMessages[generationMessageIndex]}</p><div className="loading-track" role="progressbar" aria-label="Mystery generation progress" aria-valuetext="In progress"><i /></div><span className="state-footnote">Your answer key stays sealed until your final accusation.</span>{generationSlow && <section className="generation-slow" aria-live="polite"><p>This is taking longer than usual.</p><p className="generation-cancel-note">Canceling here stops this browser’s polling and starts a fresh case with the same inputs. The server may continue preparing the earlier case in the background.</p><div><button className="button button-secondary" onClick={() => setGenerationSlow(false)}>Keep waiting</button><button className="button button-primary" disabled={busy} onClick={() => void cancelAndRetryGeneration()}>{busy ? 'Starting a fresh attempt…' : 'Cancel & retry'}</button></div></section>}{error && <p className="error-message" role="alert">{error}</p>}</div></main>;
   }
 
-  if (error && !data) return <main className="state-screen generation-error"><header className="state-topbar"><Brand /><ThemeToggle theme={theme} onToggle={toggleTheme} /></header><div className="state-content"><span className="state-emblem error-emblem">!</span><p className="eyebrow">FILE ACCESS INTERRUPTED</p><h1>This case file is unavailable.</h1><p role="alert">{error}</p><div className="state-actions"><button className="button button-secondary" disabled={busy} onClick={() => caseRetryAvailable ? void retryGeneration() : caseId && void loadCase(caseId, token)}>{busy ? 'Retrying…' : caseRetryAvailable ? 'Retry case generation' : 'Try again'}</button><a className="button button-primary" href="/#new-case">Cancel & start again →</a></div><span className="state-footnote">If this file has expired, start a new investigation.</span></div></main>;  if (!data) return null;
+  if (error && !data) return <main className="state-screen generation-error"><StageProgress stage="Generating" /><header className="state-topbar"><Brand /><ThemeToggle theme={theme} onToggle={toggleTheme} /></header><div className="state-content"><span className="state-emblem error-emblem">!</span><p className="eyebrow">FILE ACCESS INTERRUPTED</p><h1>This case file is unavailable.</h1><p role="alert">{error}</p><div className="state-actions"><button className="button button-secondary" disabled={busy} onClick={() => caseRetryAvailable ? void retryGeneration() : caseId && void loadCase(caseId, token)}>{busy ? 'Retrying…' : caseRetryAvailable ? 'Retry case generation' : 'Try again'}</button><a className="button button-primary" href="/#new-case">Cancel & start again →</a></div><span className="state-footnote">If this file has expired, start a new investigation.</span></div></main>;  if (!data) return null;
   const completed = data.status === 'completed';
   const currentSuspect = data.suspects.find((person) => person.id === suspect);
   const reviewedPercent = data.evidence.length ? Math.round(data.progress.reviewedEvidenceIds.length / data.evidence.length * 100) : 0;
@@ -378,6 +413,7 @@ function App() {
 
   return (
     <main className="case-app">
+      <StageProgress stage={completed && !reviewingCompletedCase ? 'Verdict' : 'Case'} />
       <header className="case-topbar"><Brand /><div className="case-reference"><i /><small>FICTIONAL CASE</small><span />{data.caseId.slice(0, 8).toUpperCase()}</div><div className="case-header-actions"><ThemeToggle theme={theme} onToggle={toggleTheme} /><a className="new-case-link" href="/">Close file <b>×</b></a></div></header>
       <div className="case-layout">
         <aside className="rail">
