@@ -547,3 +547,8 @@
 /* Restore the original immersive landing palette outside the case setup view. */
 .landing:not(.is-create){--bg:#111413;--raised:#191d1b;--gold:#d2aa69;--bright:#e7c38c;background:radial-gradient(ellipse at 78% 21%,#5e343421,transparent 36%),var(--bg)}
 :root[data-theme="light"] .landing:not(.is-create){--bg:#f4f1e8;--raised:#fbf9f2;--gold:#936426;--bright:#704e1d;background:radial-gradient(ellipse at 78% 21%,rgba(112,65,54,.08),transparent 36%),var(--bg)}
+@media(max-width:560px){
+  .landing:not(.is-create) .method-section,.landing:not(.is-create) .intake-section{margin-inline:-17px}
+  .landing:not(.is-create) .site-footer{width:100%;min-width:0;margin-inline:-17px;padding-inline:17px;justify-content:flex-start;flex-wrap:wrap;gap:10px 14px}
+  .landing:not(.is-create) .site-footer>a:last-child{min-width:0;max-width:100%;overflow-wrap:anywhere}
+}

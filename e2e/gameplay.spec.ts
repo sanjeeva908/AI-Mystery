@@ -241,6 +241,7 @@ test('landing scene supports accessible clue inspection, reduced motion, and its
   test.setTimeout(60_000);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const canvas = page.locator('.investigation-scene canvas');
   await expect(canvas).toBeVisible();
   await expect(page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).resolves.toBe(true);
